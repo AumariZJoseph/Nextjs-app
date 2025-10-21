@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react' // ✅ Added useCallback
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import { FileText, RefreshCw, Trash2, AlertCircle } from 'lucide-react'
@@ -17,7 +17,8 @@ export default function FileList({ onFileUpload }: FileListProps) {
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchFiles = async () => {
+  // ✅ Wrap fetchFiles in useCallback for stable reference
+  const fetchFiles = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
@@ -32,13 +33,12 @@ export default function FileList({ onFileUpload }: FileListProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
   useEffect(() => {
     fetchFiles()
-  }, [user])
+  }, [fetchFiles]) // ✅ Dependency is now stable
 
-  // ✅ Updated delete handling
   const handleDelete = async (filename: string) => {
     if (
       !user ||
@@ -126,7 +126,6 @@ export default function FileList({ onFileUpload }: FileListProps) {
         </button>
       </div>
 
-      {/* Error message */}
       {error && (
         <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-red-100 border border-red-400 text-red-700 rounded-md flex items-center gap-2 text-xs sm:text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -140,14 +139,12 @@ export default function FileList({ onFileUpload }: FileListProps) {
         </div>
       )}
 
-      {/* Deletion message */}
       {deletingFile && (
         <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded-md text-xs sm:text-sm">
           Removing {deletingFile}...
         </div>
       )}
 
-      {/* Files list */}
       {loading ? (
         <div className="text-gray-900 text-sm sm:text-base">Loading files...</div>
       ) : files.length === 0 ? (
@@ -172,7 +169,6 @@ export default function FileList({ onFileUpload }: FileListProps) {
         </ul>
       )}
 
-      {/* Process button */}
       <button
         onClick={processKnowledgeBase}
         disabled={processing || files.length === 0}
