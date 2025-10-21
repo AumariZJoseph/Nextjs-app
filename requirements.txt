@@ -1,0 +1,2 @@
+npm install @supabase/ssr
+npm install @supabase/supabase-js lucide-react
