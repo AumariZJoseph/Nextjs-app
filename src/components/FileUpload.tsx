@@ -1,261 +1,284 @@
-// components/FileUpload.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
-import { apiClient } from '@/lib/api'
+import { useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { apiClient, IngestBackgroundResponse } from '@/lib/api'
+import { Upload, FileText, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface FileUploadProps {
   onUploadSuccess?: () => void
 }
 
-interface ProcessingTask {
-  taskId: string
-  filename: string
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  progress?: number
-  error?: string
-}
-
 export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
-  const [uploadSuccess, setUploadSuccess] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [currentStage, setCurrentStage] = useState('')
-  const [processingTasks, setProcessingTasks] = useState<ProcessingTask[]>([])
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
 
-  // Poll for task status updates
-  useEffect(() => {
-    if (processingTasks.length === 0) return
-
-    const activeTasks = processingTasks.filter(task => 
-      task.status === 'queued' || task.status === 'processing'
-    )
-
-    if (activeTasks.length === 0) return
-
-    const pollInterval = setInterval(async () => {
-      for (const task of activeTasks) {
-        try {
-          const status = await apiClient.getTaskStatus(task.taskId)
-          
-          setProcessingTasks(prev => prev.map(t => 
-            t.taskId === task.taskId 
-              ? { 
-                  ...t, 
-                  status: status.status,
-                  progress: status.progress || t.progress,
-                  error: status.error 
-                }
-              : t
-          ))
-
-          // If task completed successfully
-          if (status.status === 'completed') {
-            setUploadSuccess(`File "${task.filename}" processed successfully!`)
-            if (onUploadSuccess) {
-              onUploadSuccess()
-            }
-          }
-
-          // If task failed
-          if (status.status === 'failed') {
-            setUploadError(`Failed to process "${task.filename}": ${status.error || 'Unknown error'}`)
-          }
-        } catch (error) {
-          console.error(`Failed to poll task ${task.taskId}:`, error)
-        }
-      }
-    }, 2000) // Poll every 2 seconds
-
-    return () => clearInterval(pollInterval)
-  }, [processingTasks, onUploadSuccess])
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !user) return
-
-    // Frontend file size validation (3MB)
-    const MAX_FILE_SIZE = 3 * 1024 * 1024
-    if (file.size > MAX_FILE_SIZE) {
-      setUploadError(
-        `File size exceeds 3MB limit. Your file: ${(file.size / 1024 / 1024).toFixed(2)}MB`
-      )
-      return
-    }
-
-    // File type validation
-    const allowedExtensions = ['.pdf', '.docx', '.doc', '.txt', '.csv', '.xlsx', '.xls']
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
-    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-      setUploadError(
-        `File type not supported. Please upload: ${allowedExtensions.join(', ')}`
-      )
-      return
-    }
-
-    setIsUploading(true)
-    setUploadError('')
-    setUploadSuccess('')
+  const resetState = useCallback(() => {
     setUploadProgress(0)
-    setCurrentStage('Preparing...')
+    setCurrentStage('')
+    setError('')
+    setSuccess('')
+    setIsUploading(false)
+  }, [])
+
+  const validateFile = (file: File): string => {
+    const validTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ]
+
+    const maxSize = 50 * 1024 * 1024 // 50MB
+
+    if (!validTypes.includes(file.type)) {
+      return 'Invalid file type. Please upload PDF, Word, Excel, CSV, or text files.'
+    }
+
+    if (file.size > maxSize) {
+      return 'File size too large. Maximum size is 50MB.'
+    }
+
+    if (file.size === 0) {
+      return 'File is empty.'
+    }
+
+    return ''
+  }
+
+  const handleFile = async (file: File) => {
+    if (!user) {
+      setError('Please log in to upload files')
+      return
+    }
+
+    resetState()
+    setIsUploading(true)
+
+    const validationError = validateFile(file)
+    if (validationError) {
+      setError(validationError)
+      setIsUploading(false)
+      return
+    }
 
     try {
-      // Define upload stages for frontend progress
-      const stages = [
-        'Uploading to storage...',
-        'Starting background processing...'
-      ]
+      setCurrentStage('Starting upload...')
+      setUploadProgress(10)
 
-      let currentStageIndex = 0
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return 90 // Stop at 90% until background processing completes
-          }
-          return prev + 10
-        })
+      // Try background processing first
+      setCurrentStage('Uploading file...')
+      setUploadProgress(30)
 
-        // Update stage every ~30% progress
-        if (uploadProgress % 30 === 0 && currentStageIndex < stages.length - 1) {
-          currentStageIndex++
-          setCurrentStage(stages[currentStageIndex])
-        }
-      }, 500)
+      const result: IngestBackgroundResponse = await apiClient.ingestFileBackground(user.id, file)
 
-      // Call backend API - try background processing first
-      let result
-      try {
-        // Try background processing endpoint
-        result = await apiClient.ingestFileBackground(user.id, file)
-      } catch (backgroundError) {
-        // Fallback to regular processing if background endpoint not available
-        console.warn('Background processing not available, falling back to synchronous:', backgroundError)
-        result = await apiClient.ingestFile(user.id, file)
-      }
+      setUploadProgress(70)
+      setCurrentStage('Processing file...')
 
-      clearInterval(progressInterval)
-      
       if (result.status === 'processing' && result.task_id) {
         // Background processing started
         setUploadProgress(100)
         setCurrentStage('Processing in background...')
         
-        // Add to processing tasks
-        const newTask: ProcessingTask = {
-          taskId: result.task_id,
-          filename: file.name,
-          status: 'queued',
-          progress: 0
-        }
-        
-        setProcessingTasks(prev => [...prev, newTask])
-        setUploadSuccess(`File "${file.name}" is being processed. You can continue using the app.`)
+        const taskId = result.task_id
+        let processingComplete = false
+        let attempts = 0
+        const maxAttempts = 300 // 5 minutes at 1 second intervals
+
+        const progressInterval = setInterval(async () => {
+          if (processingComplete || attempts >= maxAttempts) {
+            clearInterval(progressInterval)
+            return
+          }
+
+          attempts++
+          try {
+            const taskStatus = await apiClient.getTaskStatus(taskId)
+            
+            if (taskStatus.status === 'completed') {
+              clearInterval(progressInterval)
+              processingComplete = true
+              setSuccess('File processed successfully and added to knowledge base!')
+              setIsUploading(false)
+              if (onUploadSuccess) onUploadSuccess()
+            } else if (taskStatus.status === 'failed') {
+              clearInterval(progressInterval)
+              processingComplete = true
+              setError(taskStatus.error || 'Background processing failed')
+              setIsUploading(false)
+            }
+            // Continue polling for queued/processing states
+          } catch (error) {
+            console.error('Error checking task status:', error)
+            // Don't stop on individual errors, continue polling
+          }
+        }, 1000)
+
+        // Timeout after max attempts
+        setTimeout(() => {
+          if (!processingComplete) {
+            clearInterval(progressInterval)
+            setError('Processing timed out. The file is being processed in the background.')
+            setIsUploading(false)
+          }
+        }, maxAttempts * 1000)
+
       } else if (result.status === 'success') {
-        // Synchronous processing completed
+        // Immediate success
         setUploadProgress(100)
-        setCurrentStage('Complete!')
-        setUploadSuccess(`File "${file.name}" uploaded successfully!`)
-        if (onUploadSuccess) {
-          onUploadSuccess()
-        }
-      } else {
-        throw new Error(result.message || 'Upload failed with unknown status')
+        setSuccess('File uploaded and processed successfully!')
+        setIsUploading(false)
+        if (onUploadSuccess) onUploadSuccess()
       }
 
     } catch (error) {
-      let errorMessage = 'Upload failed'
+      console.error('Upload error:', error)
       
+      let errorMessage = 'Upload failed'
       if (error instanceof Error) {
-        // Use the specific error message from backend
-        if (error.message.includes('Security check failed')) {
-          errorMessage = 'File rejected for security reasons. Please upload a different file.'
-        } else if (error.message.includes('File type')) {
-          errorMessage = 'File type not supported or file appears to be corrupted.'
-        } else if (error.message.includes('File size')) {
-          errorMessage = 'File size exceeds limit. Please upload a smaller file.'
-        } else if (error.message.includes('rate limit')) {
-          errorMessage = 'Too many file operations. Please wait before uploading more files.'
+        if (error.message.includes('rate limit')) {
+          errorMessage = 'Too many uploads. Please wait before uploading more files.'
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.'
         } else {
           errorMessage = error.message
         }
       }
       
-      setUploadError(errorMessage)
-    } finally {
+      setError(errorMessage)
       setIsUploading(false)
-      setUploadProgress(0)
-      setCurrentStage('')
-      event.target.value = ''
     }
   }
 
-  const removeCompletedTask = (taskId: string) => {
-    setProcessingTasks(prev => prev.filter(task => task.taskId !== taskId))
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
   }
 
-  const getTaskStatusIcon = (task: ProcessingTask) => {
-    switch (task.status) {
-      case 'queued':
-        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-      case 'processing':
-        return <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />
-      case 'failed':
-        return <AlertCircle className="w-4 h-4 text-red-500" />
-      default:
-        return <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      handleFile(files[0])
     }
   }
 
-  const getTaskStatusText = (task: ProcessingTask) => {
-    switch (task.status) {
-      case 'queued':
-        return 'Queued for processing'
-      case 'processing':
-        return `Processing... ${task.progress || 0}%`
-      case 'completed':
-        return 'Processing complete'
-      case 'failed':
-        return `Failed: ${task.error || 'Unknown error'}`
-      default:
-        return 'Unknown status'
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      handleFile(files[0])
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
+  }
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  if (!user) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <p className="text-gray-600">Please log in to upload files</p>
+      </div>
+    )
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
-      <h2 className="text-lg font-semibold p-4 border-b flex items-center gap-2 text-gray-900">
-        <FileText className="w-5 h-5" />
-        Upload Document
-      </h2>
+    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <Upload className="w-5 h-5" />
+          Upload Documents
+        </h2>
+        <button
+          onClick={resetState}
+          disabled={isUploading}
+          className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          title="Reset"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-      <div className="p-4">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-900 mb-2 text-sm">Drag and drop your file here</p>
-          <p className="text-gray-700 text-xs mb-4">
-            Limit: 5 files maximum, 3MB per file
+      {/* Error message */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => setError('')}
+            className="text-red-700 hover:text-red-900 flex-shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Success message */}
+      {success && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">{success}</span>
+          <button
+            onClick={() => setSuccess('')}
+            className="text-green-700 hover:text-green-900 flex-shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Upload area */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          isDragging
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+        } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={isUploading ? undefined : handleBrowseClick}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileInput}
+          accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv"
+          disabled={isUploading}
+        />
+        
+        <FileText className="mx-auto h-12 w-12 text-gray-400" />
+        
+        <div className="mt-4">
+          <p className="text-sm font-medium text-gray-900">
+            {isUploading ? 'Uploading...' : 'Drag and drop your files here'}
           </p>
-
-          <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-not-allowed text-sm inline-block">
-            {isUploading ? 'Uploading...' : 'Browse Files'}
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={isUploading}
-              accept=".pdf,.docx,.doc,.txt,.csv,.xlsx,.xls"
-            />
-          </label>
-
-          <p className="text-gray-700 text-xs mt-4">
-            Supported formats: PDF, DOCX, DOC, TXT, CSV, XLSX, XLS
+          <p className="text-xs text-gray-500 mt-1">
+            or click to browse
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            Supports PDF, Word, Excel, CSV, and text files (max 50MB)
           </p>
         </div>
 
@@ -266,64 +289,19 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
-              ></div>
+              />
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-gray-600 mt-2">
               {currentStage} {uploadProgress}%
             </p>
           </div>
         )}
+      </div>
 
-        {/* Background processing tasks */}
-        {processingTasks.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">
-              Background Processing ({processingTasks.length})
-            </h3>
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {processingTasks.map(task => (
-                <div
-                  key={task.taskId}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-xs"
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {getTaskStatusIcon(task)}
-                    <span className="truncate text-gray-900" title={task.filename}>
-                      {task.filename}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-gray-600 text-xs">
-                      {getTaskStatusText(task)}
-                    </span>
-                    {(task.status === 'completed' || task.status === 'failed') && (
-                      <button
-                        onClick={() => removeCompletedTask(task.taskId)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Error and success messages */}
-        {uploadError && (
-          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md flex items-center gap-2 text-sm">
-            <X className="w-4 h-4 flex-shrink-0" />
-            {uploadError}
-          </div>
-        )}
-
-        {uploadSuccess && (
-          <div className="mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md text-sm">
-            {uploadSuccess}
-          </div>
-        )}
+      {/* File limits info */}
+      <div className="mt-4 text-xs text-gray-500">
+        <p>Free tier: Maximum 10 documents per user</p>
+        <p>Large documents may take several minutes to process</p>
       </div>
     </div>
   )

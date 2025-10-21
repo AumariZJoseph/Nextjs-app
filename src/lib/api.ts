@@ -1,7 +1,5 @@
-// frontend/src/lib/api.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
-// ✅ Query types
 export interface QueryRequest {
   user_id: string
   question: string
@@ -13,14 +11,14 @@ export interface QueryResponse {
   error_message?: string
 }
 
-// ✅ Auth-related types
 export interface LoginRequest {
   email: string
   password: string
 }
 
+// Define proper types instead of using 'any'
 export interface UserMetadata {
-  [key: string]: unknown // Safer than `any`
+  [key: string]: unknown
 }
 
 export interface AuthUser {
@@ -43,33 +41,28 @@ export interface LoginResponse {
   message?: string
 }
 
-// ✅ File-related types
 export interface FileListResponse {
   status: string
   files: string[]
 }
 
-// ✅ Task result typing
-export interface TaskResult {
-  [key: string]: unknown
+// Define interfaces for background ingestion
+export interface IngestBackgroundResponse {
+  status: 'processing' | 'success'
+  task_id?: string
+  message: string
 }
 
-// ✅ Health check response typing
-export interface HealthResponse {
-  status: string
-  version: string
-  database: string
-}
-
-// ✅ Document response typing
-export interface DocumentResponse {
-  status: string
-  documents: unknown[]
+export interface TaskStatusResponse {
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  progress?: number
+  error?: string
+  result?: unknown
 }
 
 class ApiClient {
-  // ✅ Base request method with safe typing
-  private async request<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // ✅ Base request method with proper error typing
+  private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`
 
     try {
@@ -81,14 +74,14 @@ class ApiClient {
         ...options,
       })
 
-      const data = (await response.json().catch(() => ({}))) as T
+      const data = await response.json().catch(() => ({})) // Prevent crash if response isn't JSON
 
+      // ✅ Handle backend error messages
       if (!response.ok) {
-        const errorData = data as Record<string, unknown>
         const errorMessage =
-          (errorData.detail as string) ||
-          (errorData.error as string) ||
-          (errorData.message as string) ||
+          data.detail ||
+          data.error ||
+          data.message ||
           `API error: ${response.statusText}`
 
         throw new Error(errorMessage)
@@ -112,7 +105,7 @@ class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), 45000)
 
     try {
-      return await this.request<QueryResponse>('/query', {
+      return await this.request('/query', {
         method: 'POST',
         body: JSON.stringify(data),
         signal: controller.signal,
@@ -127,35 +120,40 @@ class ApiClient {
     }
   }
 
-  // ✅ Auth endpoints
   async login(data: LoginRequest): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/auth/login', {
+    return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
+  // ✅ Refresh token method
   async refreshToken(
     refreshToken: string
   ): Promise<{
     status: string
-    data?: Omit<AuthData, 'user'> // Exclude user for refresh endpoint
+    data?: {
+      access_token: string
+      refresh_token: string
+      expires_at: string
+      expires_in_hours: number
+    }
     message?: string
   }> {
-    return this.request(`/auth/refresh`, {
+    return this.request('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   }
 
-  async logout(accessToken: string): Promise<{ status: string; message?: string }> {
+  async logout(accessToken: string) {
     return this.request('/auth/logout', {
       method: 'POST',
       body: JSON.stringify({ access_token: accessToken }),
     })
   }
 
-  // ✅ File ingestion
+  // ✅ Standard file ingestion
   async ingestFile(userId: string, file: File): Promise<{ status: string; message?: string }> {
     const formData = new FormData()
     formData.append('user_id', userId)
@@ -166,29 +164,25 @@ class ApiClient {
       body: formData,
     })
 
-    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
       const errorMessage =
-        (data.detail as string) ||
-        (data.error as string) ||
-        (data.message as string) ||
+        data.detail ||
+        data.error ||
+        data.message ||
         `Upload failed: ${response.statusText}`
       throw new Error(errorMessage)
     }
 
-    return data as { status: string; message?: string }
+    return data
   }
 
   // ✅ Background file ingestion
   async ingestFileBackground(
     userId: string,
     file: File
-  ): Promise<{
-    status: 'processing' | 'success'
-    task_id?: string
-    message: string
-  }> {
+  ): Promise<IngestBackgroundResponse> {
     const formData = new FormData()
     formData.append('user_id', userId)
     formData.append('file', file)
@@ -198,37 +192,25 @@ class ApiClient {
       body: formData,
     })
 
-    const data = (await response.json()) as Record<string, unknown>
+    const data = await response.json()
 
     if (!response.ok) {
       const errorMessage =
-        (data.detail as string) ||
-        (data.error as string) ||
-        (data.message as string) ||
+        data.detail ||
+        data.error ||
+        data.message ||
         `Upload failed: ${response.statusText}`
       throw new Error(errorMessage)
     }
 
-    return data as {
-      status: 'processing' | 'success'
-      task_id?: string
-      message: string
-    }
+    return data as IngestBackgroundResponse
   }
 
-  // ✅ Background task status
-  async getTaskStatus(
-    taskId: string
-  ): Promise<{
-    status: 'queued' | 'processing' | 'completed' | 'failed'
-    progress?: number
-    error?: string
-    result?: TaskResult
-  }> {
-    return this.request(`/tasks/${taskId}`, { method: 'GET' })
+  // ✅ Get background task status
+  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    return this.request(`/tasks/${taskId}`, { method: 'GET' }) as Promise<TaskStatusResponse>
   }
 
-  // ✅ File management
   async getUserFiles(userId: string): Promise<FileListResponse> {
     return this.request(`/files/${userId}`)
   }
@@ -242,11 +224,15 @@ class ApiClient {
     })
   }
 
-  async getAvailableFiles(userId: string): Promise<FileListResponse> {
-    return this.request(`/files/${userId}`, { method: 'GET' })
+  async getAvailableFiles(
+    userId: string
+  ): Promise<{ status: string; files: string[] }> {
+    return this.request(`/files/${userId}`, {
+      method: 'GET',
+    })
   }
 
-  // ✅ Conversation context clearing
+  // ✅ Clear conversation context
   async clearConversationContext(
     userId: string
   ): Promise<{ status: string; message: string }> {
@@ -255,13 +241,13 @@ class ApiClient {
     })
   }
 
-  // ✅ Health check
-  async getHealth(): Promise<HealthResponse> {
-    return this.request(`/health`, { method: 'GET' })
+  // ✅ Health check endpoint
+  async getHealth(): Promise<{ status: string; version: string; database: string }> {
+    return this.request('/health', { method: 'GET' })
   }
 
-  // ✅ User documents
-  async getUserDocuments(userId: string): Promise<DocumentResponse> {
+  // ✅ Fetch user documents
+  async getUserDocuments(userId: string): Promise<{ status: string; documents: unknown[] }> {
     return this.request(`/ingest/documents/${userId}`, { method: 'GET' })
   }
 }
