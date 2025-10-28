@@ -99,13 +99,13 @@ class ApiClient {
     }
   }
 
-  // ✅ Query method with timeout
+  // ✅ Query method with timeout - ADDED /api/v1
   async query(data: QueryRequest): Promise<QueryResponse> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 45000)
 
     try {
-      return await this.request('/query', {
+      return await this.request('/api/v1/query', {  // ✅ Added /api/v1
         method: 'POST',
         body: JSON.stringify(data),
         signal: controller.signal,
@@ -120,14 +120,15 @@ class ApiClient {
     }
   }
 
+  // ✅ ADDED /api/v1 to all auth endpoints
   async login(data: LoginRequest): Promise<LoginResponse> {
-    return this.request('/auth/login', {
+    return this.request('/api/v1/auth/login', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  // ✅ Refresh token method
+  // ✅ Refresh token method - ADDED /api/v1
   async refreshToken(
     refreshToken: string
   ): Promise<{
@@ -140,26 +141,27 @@ class ApiClient {
     }
     message?: string
   }> {
-    return this.request('/auth/refresh', {
+    return this.request('/api/v1/auth/refresh', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   }
 
+  // ✅ ADDED /api/v1
   async logout(accessToken: string) {
-    return this.request('/auth/logout', {
+    return this.request('/api/v1/auth/logout', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify({ access_token: accessToken }),
     })
   }
 
-  // ✅ Standard file ingestion
+  // ✅ Standard file ingestion - ADDED /api/v1
   async ingestFile(userId: string, file: File): Promise<{ status: string; message?: string }> {
     const formData = new FormData()
     formData.append('user_id', userId)
     formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/ingest`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ingest`, {  // ✅ Added /api/v1
       method: 'POST',
       body: formData,
     })
@@ -178,7 +180,7 @@ class ApiClient {
     return data
   }
 
-  // ✅ Background file ingestion
+  // ✅ Background file ingestion - ADDED /api/v1
   async ingestFileBackground(
     userId: string,
     file: File
@@ -187,7 +189,7 @@ class ApiClient {
     formData.append('user_id', userId)
     formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/ingest/background`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ingest/background`, {  // ✅ Added /api/v1
       method: 'POST',
       body: formData,
     })
@@ -206,49 +208,52 @@ class ApiClient {
     return data as IngestBackgroundResponse
   }
 
-  // ✅ Get background task status
+  // ✅ Get background task status - ADDED /api/v1
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    return this.request(`/tasks/${taskId}`, { method: 'GET' }) as Promise<TaskStatusResponse>
+    return this.request(`/api/v1/tasks/${taskId}`, { method: 'GET' }) as Promise<TaskStatusResponse>  // ✅ Added /api/v1
   }
 
+  // ✅ ADDED /api/v1
   async getUserFiles(userId: string): Promise<FileListResponse> {
-    return this.request(`/files/${userId}`)
+    return this.request(`/api/v1/files/${userId}`)  // ✅ Added /api/v1
   }
 
+  // ✅ ADDED /api/v1
   async deleteUserFile(
     userId: string,
     filename: string
   ): Promise<{ status: string; message: string }> {
-    return this.request(`/files/${userId}/${filename}`, {
+    return this.request(`/api/v1/files/${userId}/${filename}`, {  // ✅ Added /api/v1
       method: 'DELETE',
     })
   }
 
+  // ✅ ADDED /api/v1
   async getAvailableFiles(
     userId: string
   ): Promise<{ status: string; files: string[] }> {
-    return this.request(`/files/${userId}`, {
+    return this.request(`/api/v1/files/${userId}`, {  // ✅ Added /api/v1
       method: 'GET',
     })
   }
 
-  // ✅ Clear conversation context
+  // ✅ Clear conversation context - ADDED /api/v1
   async clearConversationContext(
     userId: string
   ): Promise<{ status: string; message: string }> {
-    return this.request(`/query/clear-context/${userId}`, {
+    return this.request(`/api/v1/query/clear-context/${userId}`, {  // ✅ Added /api/v1
       method: 'POST',
     })
   }
 
-  // ✅ Health check endpoint
+  // ✅ Health check endpoint - ADDED /api/v1
   async getHealth(): Promise<{ status: string; version: string; database: string }> {
-    return this.request('/health', { method: 'GET' })
+    return this.request('/api/v1/health', { method: 'GET' })  // ✅ Added /api/v1
   }
 
-  // ✅ Fetch user documents
+  // ✅ Fetch user documents - ADDED /api/v1
   async getUserDocuments(userId: string): Promise<{ status: string; documents: unknown[] }> {
-    return this.request(`/ingest/documents/${userId}`, { method: 'GET' })
+    return this.request(`/api/v1/ingest/documents/${userId}`, { method: 'GET' })  // ✅ Added /api/v1
   }
 }
 
