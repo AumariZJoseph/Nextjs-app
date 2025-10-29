@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { apiClient, IngestBackgroundResponse } from '@/lib/api'
+import { apiClient } from '@/lib/api' // ✅ Remove IngestBackgroundResponse import
 import { Upload, FileText, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface FileUploadProps {
@@ -75,69 +75,24 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       setCurrentStage('Starting upload...')
       setUploadProgress(10)
 
-      // Try background processing first
+      // ✅ Use standard ingestion (no background processing)
       setCurrentStage('Uploading file...')
       setUploadProgress(30)
 
-      const result: IngestBackgroundResponse = await apiClient.ingestFileBackground(user.id, file)
+      const result = await apiClient.ingestFile(user.id, file)
 
       setUploadProgress(70)
       setCurrentStage('Processing file...')
 
-      if (result.status === 'processing' && result.task_id) {
-        // Background processing started
-        setUploadProgress(100)
-        setCurrentStage('Processing in background...')
-        
-        const taskId = result.task_id
-        let processingComplete = false
-        let attempts = 0
-        const maxAttempts = 300 // 5 minutes at 1 second intervals
-
-        const progressInterval = setInterval(async () => {
-          if (processingComplete || attempts >= maxAttempts) {
-            clearInterval(progressInterval)
-            return
-          }
-
-          attempts++
-          try {
-            const taskStatus = await apiClient.getTaskStatus(taskId)
-            
-            if (taskStatus.status === 'completed') {
-              clearInterval(progressInterval)
-              processingComplete = true
-              setSuccess('File processed successfully and added to knowledge base!')
-              setIsUploading(false)
-              if (onUploadSuccess) onUploadSuccess()
-            } else if (taskStatus.status === 'failed') {
-              clearInterval(progressInterval)
-              processingComplete = true
-              setError(taskStatus.error || 'Background processing failed')
-              setIsUploading(false)
-            }
-            // Continue polling for queued/processing states
-          } catch (error) {
-            console.error('Error checking task status:', error)
-            // Don't stop on individual errors, continue polling
-          }
-        }, 1000)
-
-        // Timeout after max attempts
-        setTimeout(() => {
-          if (!processingComplete) {
-            clearInterval(progressInterval)
-            setError('Processing timed out. The file is being processed in the background.')
-            setIsUploading(false)
-          }
-        }, maxAttempts * 1000)
-
-      } else if (result.status === 'success') {
-        // Immediate success
+      // ✅ SIMPLIFIED: Only handle success case
+      if (result.status === 'success') {
         setUploadProgress(100)
         setSuccess('File uploaded and processed successfully!')
         setIsUploading(false)
         if (onUploadSuccess) onUploadSuccess()
+      } else {
+        // Handle other statuses if needed
+        throw new Error(result.message || 'Upload failed with unknown error')
       }
 
     } catch (error) {
@@ -149,6 +104,10 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
           errorMessage = 'Too many uploads. Please wait before uploading more files.'
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
           errorMessage = 'Network error. Please check your connection and try again.'
+        } else if (error.message.includes('File processing failed')) {
+          errorMessage = 'The file could not be processed. It may be corrupted or in an unsupported format.'
+        } else if (error.message.includes('Security check failed')) {
+          errorMessage = 'The file did not pass security checks. Please upload a different file.'
         } else {
           errorMessage = error.message
         }
