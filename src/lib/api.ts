@@ -1,4 +1,3 @@
-// frontend/src/lib/api.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 export interface QueryRequest {
@@ -17,19 +16,28 @@ export interface LoginRequest {
   password: string
 }
 
+// Define proper types instead of using 'any'
+export interface UserMetadata {
+  [key: string]: unknown
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  user_metadata: UserMetadata
+}
+
+export interface AuthData {
+  access_token: string
+  refresh_token: string
+  user: AuthUser
+  expires_at: string
+  expires_in_hours: number
+}
+
 export interface LoginResponse {
   status: string
-  data?: {
-    access_token: string
-    refresh_token: string
-    user: {
-      id: string
-      email: string
-      user_metadata: any
-    }
-    expires_at: string
-    expires_in_hours: number
-  }
+  data?: AuthData
   message?: string
 }
 
@@ -38,8 +46,22 @@ export interface FileListResponse {
   files: string[]
 }
 
+// Define interfaces for background ingestion
+export interface IngestBackgroundResponse {
+  status: 'processing' | 'success'
+  task_id?: string
+  message: string
+}
+
+export interface TaskStatusResponse {
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  progress?: number
+  error?: string
+  result?: unknown
+}
+
 class ApiClient {
-  // ✅ Base request method with structured error handling
+  // ✅ Base request method with proper error typing
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`
 
@@ -66,7 +88,7 @@ class ApiClient {
       }
 
       return data
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof Error) {
         throw error
       } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
@@ -77,13 +99,13 @@ class ApiClient {
     }
   }
 
-  // ✅ Query method with timeout
+  // ✅ Query method with timeout - ADDED /api/v1
   async query(data: QueryRequest): Promise<QueryResponse> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 45000)
 
     try {
-      return await this.request('/query', {
+      return await this.request('/api/v1/query', {  // ✅ Added /api/v1
         method: 'POST',
         body: JSON.stringify(data),
         signal: controller.signal,
@@ -98,14 +120,15 @@ class ApiClient {
     }
   }
 
+  // ✅ ADDED /api/v1 to all auth endpoints
   async login(data: LoginRequest): Promise<LoginResponse> {
-    return this.request('/auth/login', {
+    return this.request('/api/v1/auth/login', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  // ✅ Refresh token method
+  // ✅ Refresh token method - ADDED /api/v1
   async refreshToken(
     refreshToken: string
   ): Promise<{
@@ -118,26 +141,27 @@ class ApiClient {
     }
     message?: string
   }> {
-    return this.request('/auth/refresh', {
+    return this.request('/api/v1/auth/refresh', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   }
 
+  // ✅ ADDED /api/v1
   async logout(accessToken: string) {
-    return this.request('/auth/logout', {
+    return this.request('/api/v1/auth/logout', {  // ✅ Added /api/v1
       method: 'POST',
       body: JSON.stringify({ access_token: accessToken }),
     })
   }
 
-  // ✅ Standard file ingestion
-  async ingestFile(userId: string, file: File) {
+  // ✅ Standard file ingestion - ADDED /api/v1
+  async ingestFile(userId: string, file: File): Promise<{ status: string; message?: string }> {
     const formData = new FormData()
     formData.append('user_id', userId)
     formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/ingest`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ingest`, {  // ✅ Added /api/v1
       method: 'POST',
       body: formData,
     })
@@ -156,20 +180,16 @@ class ApiClient {
     return data
   }
 
-  // ✅ New: Background file ingestion
+  // ✅ Background file ingestion - ADDED /api/v1
   async ingestFileBackground(
     userId: string,
     file: File
-  ): Promise<{
-    status: 'processing' | 'success'
-    task_id?: string
-    message: string
-  }> {
+  ): Promise<IngestBackgroundResponse> {
     const formData = new FormData()
     formData.append('user_id', userId)
     formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/ingest/background`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ingest/background`, {  // ✅ Added /api/v1
       method: 'POST',
       body: formData,
     })
@@ -185,59 +205,55 @@ class ApiClient {
       throw new Error(errorMessage)
     }
 
-    return data
+    return data as IngestBackgroundResponse
   }
 
-  // ✅ New: Get background task status
-  async getTaskStatus(
-    taskId: string
-  ): Promise<{
-    status: 'queued' | 'processing' | 'completed' | 'failed'
-    progress?: number
-    error?: string
-    result?: any
-  }> {
-    return this.request(`/tasks/${taskId}`, { method: 'GET' })
+  // ✅ Get background task status - ADDED /api/v1
+  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    return this.request(`/api/v1/tasks/${taskId}`, { method: 'GET' }) as Promise<TaskStatusResponse>  // ✅ Added /api/v1
   }
 
+  // ✅ ADDED /api/v1
   async getUserFiles(userId: string): Promise<FileListResponse> {
-    return this.request(`/files/${userId}`)
+    return this.request(`/api/v1/files/${userId}`)  // ✅ Added /api/v1
   }
 
+  // ✅ ADDED /api/v1
   async deleteUserFile(
     userId: string,
     filename: string
   ): Promise<{ status: string; message: string }> {
-    return this.request(`/files/${userId}/${filename}`, {
+    return this.request(`/api/v1/files/${userId}/${filename}`, {  // ✅ Added /api/v1
       method: 'DELETE',
     })
   }
 
+  // ✅ ADDED /api/v1
   async getAvailableFiles(
     userId: string
   ): Promise<{ status: string; files: string[] }> {
-    return this.request(`/files/${userId}`, {
+    return this.request(`/api/v1/files/${userId}`, {  // ✅ Added /api/v1
       method: 'GET',
     })
   }
 
-  // ✅ Clear conversation context
+  // ✅ Clear conversation context - ADDED /api/v1
   async clearConversationContext(
     userId: string
   ): Promise<{ status: string; message: string }> {
-    return this.request(`/query/clear-context/${userId}`, {
+    return this.request(`/api/v1/query/clear-context/${userId}`, {  // ✅ Added /api/v1
       method: 'POST',
     })
   }
 
-  // ✅ Health check endpoint
+  // ✅ Health check endpoint - ADDED /api/v1
   async getHealth(): Promise<{ status: string; version: string; database: string }> {
-    return this.request('/health', { method: 'GET' })
+    return this.request('/api/v1/health', { method: 'GET' })  // ✅ Added /api/v1
   }
 
-  // ✅ Fetch user documents
-  async getUserDocuments(userId: string): Promise<{ status: string; documents: any[] }> {
-    return this.request(`/ingest/documents/${userId}`, { method: 'GET' })
+  // ✅ Fetch user documents - ADDED /api/v1
+  async getUserDocuments(userId: string): Promise<{ status: string; documents: unknown[] }> {
+    return this.request(`/api/v1/ingest/documents/${userId}`, { method: 'GET' })  // ✅ Added /api/v1
   }
 }
 
