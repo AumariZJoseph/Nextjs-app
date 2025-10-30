@@ -259,7 +259,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
 
       {/* File limits info */}
       <div className="mt-4 text-xs text-gray-500">
-        <p>Free tier: Maximum 10 documents per user</p>
+        <p>Free tier: Maximum 5 documents per user</p>
         <p>Large documents may take several minutes to process</p>
       </div>
     </div>
