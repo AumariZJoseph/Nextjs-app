@@ -169,13 +169,7 @@ export default function FileList({ onFileUpload }: FileListProps) {
         </ul>
       )}
 
-      <button
-        onClick={processKnowledgeBase}
-        disabled={processing || files.length === 0}
-        className="mt-3 sm:mt-4 w-full bg-green-600 text-white py-2 px-3 sm:px-4 rounded-md disabled:bg-green-300 hover:bg-green-700 transition text-sm sm:text-base"
-      >
-        {processing ? 'Processing...' : 'Process Knowledge Base'}
-      </button>
+    
     </div>
   )
 }
