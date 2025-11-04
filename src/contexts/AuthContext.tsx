@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const refreshInterval = setInterval(() => {
       checkTokenExpiration()
-    }, 60 * 1000)
+    }, 30 * 60 * 1000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
