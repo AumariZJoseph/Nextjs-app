@@ -6,6 +6,7 @@ import FileUpload from '@/components/FileUpload'
 import FileList from '@/components/FileList'
 import { LogOut, User } from 'lucide-react'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export default function HomePage() {
   const { user, logout } = useAuth()
@@ -23,7 +24,19 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <header className="bg-white shadow-sm flex-shrink-0">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 flex justify-between items-center">
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">BrainBin</h1>
+          {/* Logo + Title */}
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <Image
+              src="/logo2.png"
+              alt="BrainBin Logo"
+              width={32}
+              height={32}
+              className="w-10 h-10 sm:w-12 sm:h-12"
+              priority
+            />
+            <span>BrainBin</span>
+          </h1>
+
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
               <User className="w-3 h-3 sm:w-4 sm:h-4" />
