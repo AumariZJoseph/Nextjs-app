@@ -7,7 +7,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Document QA System',
+  title: 'BrainBin - Document QA System',
   description: 'Ask questions about your documents',
 }
 
