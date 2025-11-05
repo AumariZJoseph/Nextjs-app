@@ -24,32 +24,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // ✅ logout wrapped in useCallback
+  // ✅ Simplified logout - only frontend signOut
   const logout = useCallback(async () => {
     console.log('Logout initiated')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        console.log('Calling backend logout API')
-        await apiClient.logout(session.access_token)
-      }
-
+      // Use only frontend signOut - it handles token refresh internally
       console.log('Signing out from Supabase')
       await supabase.auth.signOut()
 
-      // Clear cookies with past expiration
+      // Clear cookies to ensure middleware sees the logout
       document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       document.cookie = 'sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 
+      // Clear local state
       setUser(null)
+      
       console.log('User state cleared, redirecting to login')
       window.location.href = '/login'
     } catch (error) {
       console.error('Logout error:', error)
+      // Even if there's an error, ensure we clear state and redirect
+      setUser(null)
+      window.location.href = '/login'
     }
   }, [])
 
-  // ✅ refreshToken wrapped in useCallback
+  // ✅ refreshToken for manual refresh if needed
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -60,6 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             access_token: result.data.access_token,
             refresh_token: result.data.refresh_token,
           })
+          
+          // ✅ Update cookies after refresh
+          const expires = new Date(result.data.expires_at)
+          document.cookie = `sb-access-token=${result.data.access_token}; path=/; expires=${expires.toUTCString()}`
+          document.cookie = `sb-refresh-token=${result.data.refresh_token}; path=/; expires=${expires.toUTCString()}`
+          
           console.log('Token refreshed successfully')
           return true
         }
@@ -71,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false
   }, [logout])
 
-  // ✅ checkTokenExpiration wrapped in useCallback
+  // ✅ checkTokenExpiration for proactive refresh (only used on app start)
   const checkTokenExpiration = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
@@ -87,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true
   }, [refreshToken])
 
-  // ✅ login wrapped in useCallback
+  // ✅ Fixed login function with proper cookie setting
   const login = useCallback(async (credentials: LoginRequest) => {
     console.log('Login attempt with:', credentials.email)
 
@@ -113,13 +119,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: newSession.user.email!,
           })
 
+          // ✅ CRITICAL: Set cookies for middleware
           const expires = new Date(result.data.expires_at)
           document.cookie = `sb-access-token=${result.data.access_token}; path=/; expires=${expires.toUTCString()}`
           document.cookie = `sb-refresh-token=${result.data.refresh_token}; path=/; expires=${expires.toUTCString()}`
 
+          // ✅ FIX: Ensure redirect happens after state update
           const urlParams = new URLSearchParams(window.location.search)
           const redirectTo = urlParams.get('from') || '/'
-          window.location.href = redirectTo
+          
+          // Use setTimeout to ensure React state updates complete
+          setTimeout(() => {
+            window.location.href = redirectTo
+          }, 100)
         }
       } else {
         throw new Error(result.message || 'Login failed')
@@ -130,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ✅ register wrapped in useCallback
+  // ✅ Fixed register function with proper cookie setting
   const register = useCallback(async (credentials: LoginRequest) => {
     console.log('Registration attempt with:', credentials.email)
 
@@ -159,13 +171,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: newSession.user.email!,
             })
 
+            // ✅ CRITICAL: Set cookies for middleware
             const expires = new Date(result.data.expires_at)
             document.cookie = `sb-access-token=${result.data.access_token}; path=/; expires=${expires.toUTCString()}`
             document.cookie = `sb-refresh-token=${result.data.refresh_token}; path=/; expires=${expires.toUTCString()}`
 
+            // ✅ FIX: Same redirect fix for register
             const urlParams = new URLSearchParams(window.location.search)
             const redirectTo = urlParams.get('from') || '/'
-            window.location.href = redirectTo
+            
+            setTimeout(() => {
+              window.location.href = redirectTo
+            }, 100)
           }
         } else {
           return {
@@ -214,10 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession()
 
-    const refreshInterval = setInterval(() => {
-      checkTokenExpiration()
-    }, 30 * 60 * 1000)
-
+    // ✅ No auto-refresh interval - Supabase handles this automatically
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session)
@@ -234,7 +248,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => {
-      clearInterval(refreshInterval)
       subscription.unsubscribe()
     }
   }, [checkTokenExpiration])
