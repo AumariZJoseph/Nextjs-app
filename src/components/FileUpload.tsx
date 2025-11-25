@@ -33,9 +33,6 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/msword',
       'text/plain',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
     ]
 
     const maxSize = 50 * 1024 * 1024 // 50MB
@@ -223,7 +220,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
           type="file"
           className="hidden"
           onChange={handleFileInput}
-          accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv"
+          accept=".pdf,.doc,.docx,.txt"
           disabled={isUploading}
         />
         
@@ -237,7 +234,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             or click to browse
           </p>
           <p className="text-xs text-gray-400 mt-2">
-            Supports PDF, Word, Excel, CSV, and text files (max 50MB)
+            Supports PDF, Word and text files (max 50MB)
           </p>
         </div>
 
