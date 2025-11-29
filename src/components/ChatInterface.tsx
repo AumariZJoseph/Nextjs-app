@@ -12,6 +12,11 @@ interface Message {
   timestamp: Date
 }
 
+// ✅ ChatInterfaceProps with optional onQuery callback
+interface ChatInterfaceProps {
+  onQuery?: () => void
+}
+
 // Component to render sources without using lookahead regex
 const SourceReferences = ({ content }: { content: string }) => {
   const sourcesIndex = content.indexOf('SOURCES:')
@@ -43,7 +48,7 @@ const SourceReferences = ({ content }: { content: string }) => {
   )
 }
 
-export default function ChatInterface() {
+export default function ChatInterface({ onQuery }: ChatInterfaceProps) { // ✅ Destructure prop
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -62,24 +67,25 @@ export default function ChatInterface() {
     e.preventDefault()
     if (!input.trim() || !user) return
 
-    // Check query limit
+    // ✅ Check query limit
     try {
-        const usageResponse = await apiClient.getUserUsage(user.id);
-        if (usageResponse.usage.queries_used >= 20) {
-            const limitMessage: Message = {
-                id: Date.now().toString(),
-                content: "Free trial limit reached! You've used 20 queries. Join our waitlist to be notified when the full version launches!",
-                role: 'assistant',
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, limitMessage]);
-            return;
+      const usageResponse = await apiClient.getUserUsage(user.id)
+      if (usageResponse.usage.queries_used >= 20) {
+        const limitMessage: Message = {
+          id: Date.now().toString(),
+          content:
+            "Free trial limit reached! You've used 20 queries. Join our waitlist to be notified when the full version launches!",
+          role: 'assistant',
+          timestamp: new Date()
         }
+        setMessages(prev => [...prev, limitMessage])
+        return
+      }
     } catch (error) {
-        console.error('Error checking usage:', error);
-    }    
+      console.error('Error checking usage:', error)
+    }
 
-    // Enhanced frontend validation
+    // Frontend validation
     if (input.trim().length < 2) {
       const validationMessage: Message = {
         id: Date.now().toString(),
@@ -114,7 +120,7 @@ export default function ChatInterface() {
     setIsLoading(true)
 
     try {
-      // Check if the user wants to clear context
+      // Clear context flow
       if (input.toLowerCase().includes('clear context') || input.toLowerCase().includes('start over')) {
         await apiClient.clearConversationContext(user.id)
         const assistantMessage: Message = {
@@ -127,7 +133,7 @@ export default function ChatInterface() {
         return
       }
 
-      // Regular query flow
+      // Regular query
       const response = await apiClient.query({
         user_id: user.id,
         question: input
@@ -141,14 +147,15 @@ export default function ChatInterface() {
           timestamp: new Date()
         }
         setMessages(prev => [...prev, assistantMessage])
+
+        // ✅ Call onQuery callback if provided
+        if (onQuery) onQuery()
       } else {
         throw new Error(response.error_message || 'Failed to get response')
       }
     } catch (error) {
       let errorContent = "I encountered an error processing your question. Please try again."
-      
       if (error instanceof Error) {
-        // Use specific error messages from backend
         if (error.message.includes('No documents found') || error.message.includes('knowledge base')) {
           errorContent = "I don't have a knowledge base yet. Please upload documents first."
         } else if (error.message.includes('rate limit') || error.message.includes('Too many requests') || error.message.includes('busy')) {
@@ -210,31 +217,18 @@ export default function ChatInterface() {
             >
               <div
                 className={`max-w-[85%] xs:max-w-xs sm:max-w-md lg:max-w-lg rounded-lg p-3 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                  message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  {message.role === 'assistant' && (
-                    <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  )}
+                  {message.role === 'assistant' && <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />}
                   <div className="whitespace-pre-wrap text-sm sm:text-base break-words">
-                    {message.role === 'assistant' ? (
-                      <SourceReferences content={message.content} />
-                    ) : (
-                      message.content
-                    )}
+                    {message.role === 'assistant' ? <SourceReferences content={message.content} /> : message.content}
                   </div>
-                  {message.role === 'user' && (
-                    <User className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  )}
+                  {message.role === 'user' && <User className="w-4 h-4 mt-0.5 flex-shrink-0" />}
                 </div>
                 <div className="text-xs text-gray-900 mt-1 opacity-70">
-                  {message.timestamp.toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             </div>
