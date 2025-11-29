@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import ChatInterface from '@/components/ChatInterface'
 import FileUpload from '@/components/FileUpload'
 import FileList from '@/components/FileList'
+import TrialStatus from '@/components/TrialStatus'
 import { LogOut, User } from 'lucide-react'
 import { useState } from 'react'
 import Image from 'next/image'
@@ -56,14 +57,17 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+        {/* 🔥 NEW: Trial Status Component */}
+        <TrialStatus />
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 h-full">
-          {/* Sidebar - Full width on mobile, 1/4 on desktop */}
+          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4 sm:space-y-6">
             <FileUpload onUploadSuccess={handleFileUpload} />
             <FileList key={refreshTrigger} onFileUpload={handleFileUpload} />
           </div>
 
-          {/* Main content - Full width on mobile, 3/4 on desktop */}
+          {/* Main content */}
           <div className="lg:col-span-3 min-h-[500px]">
             <ChatInterface />
           </div>

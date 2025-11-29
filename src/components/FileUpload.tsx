@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api' // ✅ Remove IngestBackgroundResponse import
+
 import { Upload, FileText, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface FileUploadProps {
@@ -35,14 +36,14 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       'text/plain',
     ]
 
-    const maxSize = 50 * 1024 * 1024 // 50MB
+    const maxSize = 5 * 1024 * 1024 // 5MB
 
     if (!validTypes.includes(file.type)) {
-      return 'Invalid file type. Please upload PDF, Word, Excel, CSV, or text files.'
+      return 'Invalid file type. Please upload PDF, Word, or text files.'
     }
 
     if (file.size > maxSize) {
-      return 'File size too large. Maximum size is 50MB.'
+      return 'File size too large. Maximum size is 5MB for trial accounts.'
     }
 
     if (file.size === 0) {
@@ -56,6 +57,13 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     if (!user) {
       setError('Please log in to upload files')
       return
+    }
+
+      // Check file limit
+    const usageResponse = await apiClient.getUserUsage(user.id);
+    if (usageResponse.usage.files_used >= 3) {
+        setError("Free trial limit: 3 files maximum. Join our waitlist for the full version!");
+        return;
     }
 
     resetState()

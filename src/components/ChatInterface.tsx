@@ -62,6 +62,23 @@ export default function ChatInterface() {
     e.preventDefault()
     if (!input.trim() || !user) return
 
+    // Check query limit
+    try {
+        const usageResponse = await apiClient.getUserUsage(user.id);
+        if (usageResponse.usage.queries_used >= 20) {
+            const limitMessage: Message = {
+                id: Date.now().toString(),
+                content: "Free trial limit reached! You've used 20 queries. Join our waitlist to be notified when the full version launches!",
+                role: 'assistant',
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, limitMessage]);
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking usage:', error);
+    }    
+
     // Enhanced frontend validation
     if (input.trim().length < 2) {
       const validationMessage: Message = {

@@ -237,6 +237,10 @@ class ApiClient {
     })
   }
 
+async getUserUsage(userId: string): Promise<{ status: string; usage: any }> {
+    return this.request(`/api/v1/usage/${userId}`, { method: 'GET' })
+}  
+
   // ✅ Clear conversation context - ADDED /api/v1
   async clearConversationContext(
     userId: string
