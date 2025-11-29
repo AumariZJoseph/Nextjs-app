@@ -2,18 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { apiClient, type UsageData } from '@/lib/api'
+import { apiClient } from '@/lib/api'
 
 export default function TrialStatus() {
     const { user } = useAuth()
-
-    // Typed usage state
-    const [usage, setUsage] = useState<UsageData>({
-        files_used: 0,
-        queries_used: 0,
-        files_limit: 3,
-        queries_limit: 20,
-    })
+    const [usage, setUsage] = useState({ files_used: 0, queries_used: 0, files_limit: 3, queries_limit: 20 })
 
     useEffect(() => {
         const fetchUsage = async () => {
@@ -28,8 +21,7 @@ export default function TrialStatus() {
         }
 
         fetchUsage()
-
-        // Refresh every 30 seconds
+        // Refresh every 30 seconds to keep counters updated
         const interval = setInterval(fetchUsage, 30000)
         return () => clearInterval(interval)
     }, [user])
@@ -42,13 +34,11 @@ export default function TrialStatus() {
                 <div>
                     <h3 className="font-semibold text-blue-900">Free Trial</h3>
                     <p className="text-sm text-blue-700">
-                        Files: {usage.files_used}/{usage.files_limit} •{' '}
+                        Files: {usage.files_used}/{usage.files_limit} • 
                         Queries: {usage.queries_used}/{usage.queries_limit}
                     </p>
                 </div>
-
-                {(usage.files_used >= usage.files_limit ||
-                  usage.queries_used >= usage.queries_limit) && (
+                {(usage.files_used >= 3 || usage.queries_used >= 20) && (
                     <div className="bg-orange-100 border border-orange-300 rounded px-3 py-1">
                         <p className="text-sm text-orange-800 font-medium">Trial Complete</p>
                     </div>

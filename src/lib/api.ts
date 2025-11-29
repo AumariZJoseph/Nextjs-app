@@ -1,17 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
-export interface UsageData {
-  files_used: number;
-  queries_used: number;
-  files_limit: number;
-  queries_limit: number;
-}
-
-export interface UserUsageResponse {
-  status: string;
-  usage: UsageData;
-}
-
 export interface QueryRequest {
   user_id: string
   question: string
@@ -249,9 +237,9 @@ class ApiClient {
     })
   }
 
-async getUserUsage(userId: string): Promise<UserUsageResponse> {
-    return this.request(`/api/v1/usage/${userId}`, { method: 'GET' }) as Promise<UserUsageResponse>;
-}
+async getUserUsage(userId: string): Promise<{ status: string; usage: any }> {
+    return this.request(`/api/v1/usage/${userId}`, { method: 'GET' })
+}  
 
   // ✅ Clear conversation context - ADDED /api/v1
   async clearConversationContext(

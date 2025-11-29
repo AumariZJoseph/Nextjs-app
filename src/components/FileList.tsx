@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react' // ✅ Added useCallback
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import { FileText, RefreshCw, Trash2, AlertCircle } from 'lucide-react'
@@ -13,9 +13,11 @@ export default function FileList({ onFileUpload }: FileListProps) {
   const [files, setFiles] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [processing, setProcessing] = useState(false)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
   const { user } = useAuth()
 
+  // ✅ Wrap fetchFiles in useCallback for stable reference
   const fetchFiles = useCallback(async () => {
     if (!user) return
 
@@ -35,7 +37,7 @@ export default function FileList({ onFileUpload }: FileListProps) {
 
   useEffect(() => {
     fetchFiles()
-  }, [fetchFiles])
+  }, [fetchFiles]) // ✅ Dependency is now stable
 
   const handleDelete = async (filename: string) => {
     if (
@@ -71,6 +73,34 @@ export default function FileList({ onFileUpload }: FileListProps) {
     }
   }
 
+  const processKnowledgeBase = async () => {
+    if (!user) return
+
+    setProcessing(true)
+    setError('')
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/ingest/process/${user.id}`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      if (result.status === 'success') {
+        alert('Knowledge base processed successfully!')
+        await fetchFiles()
+      } else {
+        throw new Error(result.message || 'Processing failed')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Processing failed')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   if (!user) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -84,7 +114,7 @@ export default function FileList({ onFileUpload }: FileListProps) {
       <div className="flex justify-between items-center mb-3 sm:mb-4 text-gray-900">
         <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
           <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" />
-          Your Documents ({files.length}/3)
+          Your Documents ({files.length}/5)
         </h2>
         <button
           onClick={fetchFiles}
@@ -138,6 +168,8 @@ export default function FileList({ onFileUpload }: FileListProps) {
           ))}
         </ul>
       )}
+
+    
     </div>
   )
 }
