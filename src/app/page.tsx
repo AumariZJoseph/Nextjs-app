@@ -12,6 +12,7 @@ import Image from 'next/image'
 export default function HomePage() {
   const { user, logout } = useAuth()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [usageRefreshTrigger, setUsageRefreshTrigger] = useState(0)
 
   const handleLogout = async () => {
     await logout()
@@ -19,6 +20,16 @@ export default function HomePage() {
 
   const handleFileUpload = () => {
     setRefreshTrigger(prev => prev + 1)
+    setUsageRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleFileDelete = () => {
+    setRefreshTrigger(prev => prev + 1)
+    setUsageRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleQuery = () => {
+    setUsageRefreshTrigger(prev => prev + 1)
   }
 
   return (
@@ -57,19 +68,23 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
-        {/* 🔥 NEW: Trial Status Component */}
-        <TrialStatus />
+        {/* Trial Status */}
+        <TrialStatus refreshTrigger={usageRefreshTrigger} />
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 h-full">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4 sm:space-y-6">
             <FileUpload onUploadSuccess={handleFileUpload} />
-            <FileList key={refreshTrigger} onFileUpload={handleFileUpload} />
+            <FileList 
+              key={refreshTrigger} 
+              onFileUpload={handleFileUpload} 
+              onFileDelete={handleFileDelete} // ✅ Now properly typed
+            />
           </div>
 
           {/* Main content */}
           <div className="lg:col-span-3 min-h-[500px]">
-            <ChatInterface />
+            <ChatInterface onQuery={handleQuery} /> {/* ✅ Now properly typed */}
           </div>
         </div>
       </main>

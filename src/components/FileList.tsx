@@ -5,11 +5,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import { FileText, RefreshCw, Trash2, AlertCircle } from 'lucide-react'
 
+// ✅ Updated interface with both callbacks
 interface FileListProps {
-  onFileUpload?: () => void;
+  onFileUpload?: () => void
+  onFileDelete?: () => void
 }
 
-export default function FileList({ onFileUpload }: FileListProps) {
+export default function FileList({ onFileUpload, onFileDelete }: FileListProps) { // ✅ Destructure props
   const [files, setFiles] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -51,6 +53,7 @@ export default function FileList({ onFileUpload }: FileListProps) {
         await new Promise(resolve => setTimeout(resolve, 1000))
         await fetchFiles()
         if (onFileUpload) onFileUpload()
+        if (onFileDelete) onFileDelete() // ✅ Now this works
       } else {
         setError(response.message || 'Failed to delete file')
       }

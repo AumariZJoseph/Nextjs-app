@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient, type UsageData } from '@/lib/api'
 
-export default function TrialStatus() {
-    const { user } = useAuth()
+interface TrialStatusProps {
+  refreshTrigger?: number  // ✅ Add this prop
+}
 
-    // Typed usage state
+export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
+    const { user } = useAuth()
     const [usage, setUsage] = useState<UsageData>({
         files_used: 0,
         queries_used: 0,
@@ -32,7 +34,7 @@ export default function TrialStatus() {
         // Refresh every 30 seconds
         const interval = setInterval(fetchUsage, 30000)
         return () => clearInterval(interval)
-    }, [user])
+    }, [user, refreshTrigger]) // ✅ Add refreshTrigger to dependencies
 
     if (!user) return null
 
