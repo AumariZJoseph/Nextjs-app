@@ -16,6 +16,8 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
         files_limit: 3,
         queries_limit: 20,
     })
+    const [isJoiningWaitlist, setIsJoiningWaitlist] = useState(false)
+    const [waitlistMessage, setWaitlistMessage] = useState('')
 
     useEffect(() => {
         const fetchUsage = async () => {
@@ -30,17 +32,29 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
         }
 
         fetchUsage()
-
-        // Refresh every 30 seconds
         const interval = setInterval(fetchUsage, 30000)
         return () => clearInterval(interval)
     }, [user, refreshTrigger])
 
+    const handleJoinWaitlist = async () => {
+        if (!user) return
+        
+        setIsJoiningWaitlist(true)
+        setWaitlistMessage('')
+        
+        try {
+            const response = await apiClient.joinWaitlist(user.id, user.email)
+            setWaitlistMessage(response.message)
+        } catch (error) {
+            setWaitlistMessage('Failed to join waitlist. Please try again.')
+        } finally {
+            setIsJoiningWaitlist(false)
+        }
+    }
+
     if (!user) return null
 
-    // ✅ Only show "Trial Complete" when QUERY limit is reached
     const isTrialComplete = usage.queries_used >= usage.queries_limit
-    // ✅ Show file limit warning separately
     const isFileLimitReached = usage.files_used >= usage.files_limit
 
     return (
@@ -52,18 +66,31 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
                         Files: {usage.files_used}/{usage.files_limit} •{' '}
                         Queries: {usage.queries_used}/{usage.queries_limit}
                     </p>
-                    {/* ✅ Show file limit warning */}
                     {isFileLimitReached && !isTrialComplete && (
                         <p className="text-xs text-orange-600 mt-1">
                             File limit reached. You can still ask questions!
                         </p>
                     )}
+                    {waitlistMessage && (
+                        <p className="text-xs text-green-600 mt-1">{waitlistMessage}</p>
+                    )}
                 </div>
 
-                {/* ✅ Only show "Trial Complete" when query limit is reached */}
                 {isTrialComplete && (
-                    <div className="bg-orange-100 border border-orange-300 rounded px-3 py-1">
-                        <p className="text-sm text-orange-800 font-medium">Trial Complete</p>
+                    <div className="flex items-center gap-2">
+                        {!waitlistMessage ? (
+                            <button
+                                onClick={handleJoinWaitlist}
+                                disabled={isJoiningWaitlist}
+                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isJoiningWaitlist ? 'Joining...' : 'Join Waitlist for Full Version'}
+                            </button>
+                        ) : (
+                            <div className="bg-green-100 border border-green-300 rounded px-3 py-1">
+                                <p className="text-sm text-green-800 font-medium">On Waitlist! 🎉</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

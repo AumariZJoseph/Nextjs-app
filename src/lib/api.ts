@@ -1,5 +1,15 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
+export interface WaitlistRequest {
+    user_id: string
+    email: string
+}
+
+export interface WaitlistResponse {
+    status: string
+    message: string
+}
+
 export interface UsageData {
   files_used: number;
   queries_used: number;
@@ -267,10 +277,21 @@ async getUserUsage(userId: string): Promise<UserUsageResponse> {
     return this.request('/api/v1/health', { method: 'GET' })  // ✅ Added /api/v1
   }
 
+  async joinWaitlist(userId: string, email: string): Promise<WaitlistResponse> {
+    return this.request('/waitlist', {
+        method: 'POST',
+        body: JSON.stringify({
+            user_id: userId,
+            email: email
+        }),
+    }) as Promise<WaitlistResponse>
+}
+
   // ✅ Fetch user documents - ADDED /api/v1
   async getUserDocuments(userId: string): Promise<{ status: string; documents: unknown[] }> {
     return this.request(`/api/v1/ingest/documents/${userId}`, { method: 'GET' })  // ✅ Added /api/v1
   }
 }
+
 
 export const apiClient = new ApiClient()
