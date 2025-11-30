@@ -278,7 +278,7 @@ async getUserUsage(userId: string): Promise<UserUsageResponse> {
   }
 
   async joinWaitlist(userId: string, email: string): Promise<WaitlistResponse> {
-    return this.request('/waitlist', {
+    return this.request('/api/v1/waitlist', {
         method: 'POST',
         body: JSON.stringify({
             user_id: userId,
