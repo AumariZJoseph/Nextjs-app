@@ -253,7 +253,7 @@ const handleFile = async (file: File) => {
             or click to browse
           </p>
           <p className="text-xs text-gray-400 mt-2">
-            Supports PDF, Word and text files (max 50MB)
+            Supports PDF, Word and text files (max 5MB for free trial)
           </p>
         </div>
 
@@ -275,8 +275,8 @@ const handleFile = async (file: File) => {
 
       {/* File limits info */}
       <div className="mt-4 text-xs text-gray-500">
-        <p>Free tier: Maximum 5 documents per user</p>
-        <p>Large documents may take several minutes to process</p>
+        <p>Free tier: Maximum 3 documents per user</p>
+        <p>Longer or more complex documents may take extra time to process</p>
       </div>
     </div>
   )
