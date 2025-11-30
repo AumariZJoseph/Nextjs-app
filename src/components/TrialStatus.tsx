@@ -76,23 +76,33 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
                     )}
                 </div>
 
-                {isTrialComplete && (
-                    <div className="flex items-center gap-2">
-                        {!waitlistMessage ? (
-                            <button
-                                onClick={handleJoinWaitlist}
-                                disabled={isJoiningWaitlist}
-                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isJoiningWaitlist ? 'Joining...' : 'Join Waitlist for Full Version'}
-                            </button>
-                        ) : (
-                            <div className="bg-green-100 border border-green-300 rounded px-3 py-1">
-                                <p className="text-sm text-green-800 font-medium">On Waitlist! 🎉</p>
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* ✅ ALWAYS show waitlist button, but change style based on trial status */}
+                <div className="flex items-center gap-2">
+                    {!waitlistMessage ? (
+                        <button
+                            onClick={handleJoinWaitlist}
+                            disabled={isJoiningWaitlist}
+                            className={`
+                                px-3 py-1 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed
+                                ${isTrialComplete 
+                                    ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                }
+                            `}
+                        >
+                            {isJoiningWaitlist 
+                                ? 'Joining...' 
+                                : isTrialComplete 
+                                    ? 'Trial Complete - Join Waitlist for Full Version' 
+                                    : 'Join Waitlist for Full Version'
+                            }
+                        </button>
+                    ) : (
+                        <div className="bg-green-100 border border-green-300 rounded px-3 py-1">
+                            <p className="text-sm text-green-800 font-medium">On Waitlist! 🎉</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
