@@ -74,7 +74,7 @@ export default function ChatInterface({ onQuery }: ChatInterfaceProps) { // ✅ 
         const limitMessage: Message = {
           id: Date.now().toString(),
           content:
-            "Free trial limit reached! You've used 20 queries. Join our waitlist to be notified when the full version launches!",
+            "🚀 **Trial Complete!**\n\nYou've used all 20 free queries.\nJoin our waitlist to be notified when the full version launches!",
           role: 'assistant',
           timestamp: new Date()
         }

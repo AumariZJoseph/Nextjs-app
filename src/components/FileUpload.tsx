@@ -53,10 +53,21 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     return ''
   }
 
-  const handleFile = async (file: File) => {
+const handleFile = async (file: File) => {
     if (!user) {
-      setError('Please log in to upload files')
-      return
+        setError('Please log in to upload files')
+        return
+    }
+
+    // ✅ FIRST: Check if trial is complete (query limit reached)
+    try {
+        const usageResponse = await apiClient.getUserUsage(user.id);
+        if (usageResponse.usage.queries_used >= 20) {
+            setError("Trial complete! You've used all 20 queries. Join our waitlist for the full version!");
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking usage:', error);
     }
 
       // Check file limit

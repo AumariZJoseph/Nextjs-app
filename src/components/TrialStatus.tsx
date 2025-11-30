@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { apiClient, type UsageData } from '@/lib/api'
 
 interface TrialStatusProps {
-  refreshTrigger?: number  // ✅ Add this prop
+  refreshTrigger?: number
 }
 
 export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
@@ -34,9 +34,14 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
         // Refresh every 30 seconds
         const interval = setInterval(fetchUsage, 30000)
         return () => clearInterval(interval)
-    }, [user, refreshTrigger]) // ✅ Add refreshTrigger to dependencies
+    }, [user, refreshTrigger])
 
     if (!user) return null
+
+    // ✅ Only show "Trial Complete" when QUERY limit is reached
+    const isTrialComplete = usage.queries_used >= usage.queries_limit
+    // ✅ Show file limit warning separately
+    const isFileLimitReached = usage.files_used >= usage.files_limit
 
     return (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -47,10 +52,16 @@ export default function TrialStatus({ refreshTrigger = 0 }: TrialStatusProps) {
                         Files: {usage.files_used}/{usage.files_limit} •{' '}
                         Queries: {usage.queries_used}/{usage.queries_limit}
                     </p>
+                    {/* ✅ Show file limit warning */}
+                    {isFileLimitReached && !isTrialComplete && (
+                        <p className="text-xs text-orange-600 mt-1">
+                            File limit reached. You can still ask questions!
+                        </p>
+                    )}
                 </div>
 
-                {(usage.files_used >= usage.files_limit ||
-                  usage.queries_used >= usage.queries_limit) && (
+                {/* ✅ Only show "Trial Complete" when query limit is reached */}
+                {isTrialComplete && (
                     <div className="bg-orange-100 border border-orange-300 rounded px-3 py-1">
                         <p className="text-sm text-orange-800 font-medium">Trial Complete</p>
                     </div>
